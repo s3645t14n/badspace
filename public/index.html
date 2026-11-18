@@ -1,0 +1,34 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Космос — прототип</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="space"></canvas>
+
+  <div id="hud">
+    <div class="hud-item">Топливо: <span id="fuel" style="color: #7fffd4;">100.0</span></div>
+    <div class="hud-item">Скорость: <span id="speed">0.00</span></div>
+    <div class="hud-item">Тик: <span id="tick">0</span></div>
+    <div class="hud-item">X: <span id="posX">0</span> Y: <span id="posY">0</span></div>
+    <div class="hud-item">Zoom: <span id="zoom">1.00</span></div>
+    <div class="hud-item">Сфера: <span id="sphere">—</span></div>
+    <div class="hud-item">Орбита: <span id="orbital">—</span></div>
+    <div class="hud-item" style="margin-left: auto;">Дата: <span id="date">1 апреля 5027</span></div>
+    <div class="hud-item">Возраст: <span id="age" style="color: #ff6060;">20 г. 0 мес.</span></div>
+    <div class="hud-item">Темп: <span id="timerate" style="color: #7fffd4;">x1.0</span></div>
+  </div>
+
+  <div id="controls">
+    <button id="left" class="btn turn" type="button">⟲</button>
+    <button id="thrust" class="btn thrust" type="button">▲ Двигатель</button>
+    <button id="reverse" class="btn reverse" type="button">▼ Реверс</button>
+    <button id="right" class="btn turn" type="button">⟳</button>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

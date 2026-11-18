@@ -1,0 +1,2835 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+public/
+  css/
+    style.css
+  js/
+    core/
+      autopilot.js
+      gravity.js
+      impulse.js
+      loop.js
+      physics.js
+      profiler.js
+      state.js
+    entities/
+      bodies.js
+      ship.js
+      systemGenerator.js
+    input/
+      controls.js
+      wheel.js
+    render/
+      autopilotUI.js
+      bodies.js
+      canvas.js
+      hud.js
+      impulseBar.js
+      orbitHints.js
+      prediction.js
+      ship.js
+      stars.js
+      throttleIndicator.js
+      trail.js
+      worldOverlay.js
+    world/
+      world.js
+    config.js
+    main.js
+  index.html
+package.json
+server.js
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="public/css/style.css">
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#space {
+  position: fixed;
+  inset: 0;
+  display: block;
+}
+
+#hud {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  gap: 18px;
+  color: #7fffd4;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(127, 255, 212, 0.6);
+  pointer-events: none;
+  z-index: 10;
+  font-variant-numeric: tabular-nums;
+}
+
+#hud .hud-item span {
+  color: #fff;
+  font-weight: 600;
+}
+
+#controls {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 20px;
+  z-index: 10;
+}
+
+.btn {
+  padding: 16px 32px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: #fff;
+  background: rgba(20, 30, 50, 0.7);
+  border: 2px solid rgba(120, 200, 255, 0.5);
+  border-radius: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: all 0.12s ease;
+  touch-action: none;
+}
+
+.btn:hover {
+  border-color: rgba(120, 200, 255, 0.9);
+}
+
+.btn:active,
+.btn.active {
+  background: rgba(80, 180, 255, 0.45);
+  border-color: #9fdcff;
+  box-shadow: 0 0 24px rgba(120, 200, 255, 0.7);
+  transform: scale(0.96);
+}
+
+.btn.turn {
+  padding: 16px 22px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.thrust.active {
+  background: rgba(80, 255, 140, 0.4);
+  border-color: #7dffa8;
+  box-shadow: 0 0 24px rgba(80, 255, 140, 0.7);
+}
+
+.reverse.active {
+  background: rgba(255, 120, 80, 0.4);
+  border-color: #ffb08a;
+  box-shadow: 0 0 24px rgba(255, 140, 80, 0.7);
+}
+
+.btn.turn.active {
+  background: rgba(255, 220, 120, 0.4);
+  border-color: #ffe08a;
+  box-shadow: 0 0 24px rgba(255, 220, 120, 0.7);
+}
+</file>
+
+<file path="public/js/core/autopilot.js">
+import { CONFIG } from '../config.js';
+import { dominantBody } from '../entities/bodies.js';
+
+export function updateCharge(state, dtRealSeconds) {
+  const ap = state.autopilot;
+  const ship = state.ship;
+  const system = state.world.shipSystem;
+  const planet = dominantBody(system, ship.x, ship.y);
+
+  let inMini = false;
+  if (planet) {
+    const miniR = planet.hill * CONFIG.autopilot.miniHillFraction;
+    const d = Math.hypot(ship.x - planet.x, ship.y - planet.y);
+    if (d < miniR) inMini = true;
+  }
+
+  if (inMini && planet) {
+    ap.charge = Math.min(CONFIG.autopilot.chargeTime, ap.charge + dtRealSeconds);
+    ap.planet = planet;
+  } else {
+    ap.charge = 0;
+    ap.planet = null;
+  }
+
+  ap.ready = ap.charge >= CONFIG.autopilot.chargeTime;
+}
+
+export function autopilotControl(state, input) {
+  const ap = state.autopilot;
+  ap.active = !!(input.space && ap.ready && ap.planet);
+
+  if (!ap.active) {
+    return { ax: 0, ay: 0, targetAngle: null, parked: false };
+  }
+
+  const ship = state.ship;
+  const planet = ap.planet;
+  const {
+    lockRadiusFactor, lockRadiusOffset, kPos, kVel, maxAccelFactor,
+    deadRadius, deadSpeed,
+  } = CONFIG.autopilot;
+
+  const rLock = planet.radius * lockRadiusFactor + lockRadiusOffset;
+
+  const rx = ship.x - planet.x;
+  const ry = ship.y - planet.y;
+  const r = Math.hypot(rx, ry) || 1e-9;
+  const ux = rx / r;
+  const uy = ry / r;
+
+  const rvx = ship.vx - planet.vx;
+  const rvy = ship.vy - planet.vy;
+
+  const rvLen = Math.hypot(rvx, rvy);
+  const dr = Math.abs(r - rLock);
+
+  if (dr < deadRadius && rvLen < deadSpeed) {
+    return { ax: 0, ay: 0, targetAngle: null, parked: true };
+  }
+
+  const vRef = 0.1;
+  const vRadTarget = (rLock - r) * kPos * vRef / 0.01;
+  const targetVx = ux * vRadTarget;
+  const targetVy = uy * vRadTarget;
+
+  let ax = (targetVx - rvx) * kVel;
+  let ay = (targetVy - rvy) * kVel;
+
+  const aMax = CONFIG.physics.accel * maxAccelFactor;
+  const aLen = Math.hypot(ax, ay);
+  if (aLen > aMax) {
+    ax = (ax / aLen) * aMax;
+    ay = (ay / aLen) * aMax;
+  }
+
+  const targetAngle = Math.atan2(-ry, -rx);
+
+  return { ax, ay, targetAngle, parked: false };
+}
+</file>
+
+<file path="public/js/core/gravity.js">
+import { CONFIG } from '../config.js';
+
+// Ускорение от всех тел в точке (px, py). Мягкий потенциал гасит
+// сингулярность в центре: r² заменяется на r² + ε².
+export function gravityAt(px, py, bodiesList) {
+  const { G, softening } = CONFIG.physics;
+  const eps2 = softening * softening;
+
+  let ax = 0;
+  let ay = 0;
+
+  for (const b of bodiesList) {
+    const dx = b.x - px;
+    const dy = b.y - py;
+    const r2 = dx * dx + dy * dy + eps2;
+    const invR = 1 / Math.sqrt(r2);
+    const invR3 = invR * invR * invR;
+    const k = G * b.mass * invR3;
+    ax += dx * k;
+    ay += dy * k;
+  }
+
+  return { ax, ay };
+}
+
+// Velocity Verlet для одной частицы под действием гравитации + внешней тяги.
+// Возвращает новое состояние {x,y,vx,vy}.
+export function verletStep(x, y, vx, vy, ax, ay, thrustX, thrustY, dt) {
+  const halfDt = 0.5 * dt;
+  // Полушаг по скорости с текущим ускорением.
+  const vxHalf = vx + (ax + thrustX) * halfDt;
+  const vyHalf = vy + (ay + thrustY) * halfDt;
+  // Полный шаг по позиции.
+  const nx = x + vxHalf * dt;
+  const ny = y + vyHalf * dt;
+  return { x: nx, y: ny, vx: vxHalf, vy: vyHalf };
+}
+</file>
+
+<file path="public/js/core/impulse.js">
+import { CONFIG } from '../config.js';
+import { dominantBody } from '../entities/bodies.js';
+
+export function updateImpulse(state, input, system, dtRealSeconds) {
+  const ship = state.ship;
+  const planet = dominantBody(system, ship.x, ship.y);
+  const inHill = planet !== null;
+
+  if (inHill) {
+    const distToPlanet = Math.hypot(ship.x - planet.x, ship.y - planet.y);
+    const miniR = planet.hill * CONFIG.autopilot.miniHillFraction;
+
+    if (distToPlanet < miniR) {
+      ship.impulse += (CONFIG.impulse.maxCharge / 5.0) * dtRealSeconds;
+      if (ship.impulse >= CONFIG.impulse.maxCharge) {
+        ship.impulse = CONFIG.impulse.maxCharge;
+      }
+    }
+  }
+
+  const wasSpace = ship._wasSpace || false;
+  ship._wasSpace = input.space;
+
+  if (inHill) {
+    ship.timeWarpActive = false;
+    return;
+  }
+
+  if (input.space && !wasSpace) {
+    if (ship.impulse >= CONFIG.impulse.maxCharge - 0.01) {
+      ship.impulse = 0;
+      
+      const nx = Math.cos(ship.angle) * 50;
+      const ny = Math.sin(ship.angle) * 50;
+      if (Number.isFinite(nx)) ship.vx = nx;
+      if (Number.isFinite(ny)) ship.vy = ny;
+    }
+  }
+}
+</file>
+
+<file path="public/js/core/loop.js">
+import { CONFIG } from '../config.js';
+
+export function startLoop({ onTick, onRender, onAfterFrame, getTimeScale }) {
+  const tickMs = 1000 / CONFIG.tick.rate;
+  const maxDelta = CONFIG.tick.maxFrameDelta;
+
+  let acc = 0;
+  let last = performance.now();
+
+  function frame(now) {
+    const dt = Math.min(now - last, maxDelta);
+    last = now;
+
+    const scale = getTimeScale ? getTimeScale() : 1;
+    acc += dt * scale;
+
+    // Ограничиваем число тиков за кадр, чтобы при scale=10 не было спирали смерти.
+    let ticksProcessed = 0;
+    while (acc >= tickMs && ticksProcessed < 20) {
+      onTick(tickMs / 1000);
+      acc -= tickMs;
+      ticksProcessed++;
+    }
+    
+    // Если накопилось слишком много (был лаг), сбрасываем остаток.
+    if (acc > tickMs * 20) acc = 0;
+
+    onRender(now);
+    if (onAfterFrame) onAfterFrame();
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+}
+</file>
+
+<file path="public/js/core/physics.js">
+import { CONFIG } from '../config.js';
+import { gravityAt } from './gravity.js';
+import { allBodies, dominantBody } from '../entities/bodies.js';
+import { updateImpulse } from './impulse.js';
+
+export function simulateTick(state, input, bodies, dtRealSeconds) {
+  state.tickCount++;
+  const ship = state.ship;
+  const world = state.world;
+  const system = world.shipSystem;
+  const capture = world.captureSystem;
+  const bodiesList = allBodies(system);
+  const dt = 1;
+
+  const { turnAccel, turnMax, turnDamping, throttleRate } = CONFIG.physics;
+  const { accel, lateralAccel } = CONFIG.physics;
+
+  if (!Number.isFinite(dtRealSeconds) || dtRealSeconds <= 0) dtRealSeconds = 0.016;
+  if (!Number.isFinite(ship.throttleMain)) ship.throttleMain = 0;
+  if (!Number.isFinite(ship.throttleLateral)) ship.throttleLateral = 0;
+  if (!Number.isFinite(ship.angle)) ship.angle = 0;
+  if (!Number.isFinite(ship.angularVel)) ship.angularVel = 0;
+
+  const rate = throttleRate * dtRealSeconds;
+  
+  if (input.thrust) ship.throttleMain = Math.min(1, ship.throttleMain + rate);
+  else if (input.reverse) ship.throttleMain = Math.max(-1, ship.throttleMain - rate);
+  else {
+    if (Math.abs(ship.throttleMain) <= rate) ship.throttleMain = 0;
+    else ship.throttleMain -= Math.sign(ship.throttleMain) * rate;
+  }
+
+  if (input.turnRight) ship.throttleLateral = Math.min(1, ship.throttleLateral + rate);
+  else if (input.turnLeft) ship.throttleLateral = Math.max(-1, ship.throttleLateral - rate);
+  else {
+    if (Math.abs(ship.throttleLateral) <= rate) ship.throttleLateral = 0;
+    else ship.throttleLateral -= Math.sign(ship.throttleLateral) * rate;
+  }
+
+  updateImpulse(state, input, system, dtRealSeconds);
+
+  const planet = dominantBody(system, ship.x, ship.y);
+  let targetAngle = ship.angle;
+  if (planet) {
+    const dx = ship.x - system.cx;
+    const dy = ship.y - system.cy;
+    if (dx !== 0 || dy !== 0) {
+      const angleToShip = Math.atan2(dy, dx);
+      const direction = planet.omega > 0 ? 1 : -1;
+      targetAngle = angleToShip + direction * Math.PI / 2;
+    }
+  } else {
+    const speed = Math.hypot(ship.vx, ship.vy);
+    if (speed > 0.01) {
+      targetAngle = Math.atan2(ship.vy, ship.vx);
+    }
+  }
+
+  const turnSpeed = 0.05;
+  const diff = angleDiff(ship.angle, targetAngle);
+  ship.angle += diff * turnSpeed;
+
+  while (ship.angle > Math.PI) ship.angle -= Math.PI * 2;
+  while (ship.angle < -Math.PI) ship.angle += Math.PI * 2;
+
+  const ca = Math.cos(ship.angle);
+  const sa = Math.sin(ship.angle);
+
+  const fwd = accel * ship.throttleMain;
+  const lat = lateralAccel * ship.throttleLateral;
+
+  const rx = -sa;
+  const ry =  ca;
+
+  const tx = ca * fwd + rx * lat;
+  const ty = sa * fwd + ry * lat;
+
+  const g1 = gravityAt(ship.x, ship.y, bodiesList);
+  ship.vx += (g1.ax + tx) * 0.5 * dt;
+  ship.vy += (g1.ay + ty) * 0.5 * dt;
+
+  if (!system && capture) {
+    const dx = capture.cx - ship.x;
+    const dy = capture.cy - ship.y;
+    const r = Math.hypot(dx, dy) || 1e-9;
+    const t = 1 - Math.min(1, (r - capture.influenceRadius) / (capture.captureRadius - capture.influenceRadius));
+    const strength = CONFIG.physics.G * capture.star.mass / (r * r) * t * 0.3;
+    ship.vx += (dx / r) * strength * 0.5 * dt;
+    ship.vy += (dy / r) * strength * 0.5 * dt;
+  }
+
+  ship.x += ship.vx * dt;
+  ship.y += ship.vy * dt;
+
+  const g2 = gravityAt(ship.x, ship.y, bodiesList);
+  ship.vx += (g2.ax + tx) * 0.5 * dt;
+  ship.vy += (g2.ay + ty) * 0.5 * dt;
+
+  if (!system && capture) {
+    const dx = capture.cx - ship.x;
+    const dy = capture.cy - ship.y;
+    const r = Math.hypot(dx, dy) || 1e-9;
+    const t = 1 - Math.min(1, (r - capture.influenceRadius) / (capture.captureRadius - capture.influenceRadius));
+    const strength = CONFIG.physics.G * capture.star.mass / (r * r) * t * 0.3;
+    ship.vx += (dx / r) * strength * 0.5 * dt;
+    ship.vy += (dy / r) * strength * 0.5 * dt;
+  }
+
+  if (!Number.isFinite(ship.x) || !Number.isFinite(ship.y) || !Number.isFinite(ship.vx) || !Number.isFinite(ship.vy)) {
+    console.error('[physics] Force reset due to NaN!', { ship });
+    if (system) {
+      ship.x = system.cx + CONFIG.ship.startOrbit;
+      ship.y = system.cy;
+    } else {
+      ship.x = 0;
+      ship.y = 0;
+    }
+    ship.vx = 0;
+    ship.vy = 0;
+    ship.angle = 0;
+    ship.angularVel = 0;
+  }
+}
+
+function angleDiff(a, b) {
+  let d = b - a;
+  while (d >  Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
+export function predictTrajectory(ship, world, horizonTicks, sampleEvery) {
+  const dt = 1;
+  const system = world.shipSystem;
+  const capture = world.captureSystem;
+  
+  let body = null;
+  let bodyVx = 0, bodyVy = 0;
+
+  if (system) {
+    const planet = dominantBody(system, ship.x, ship.y);
+    if (planet) {
+      body = { x: planet.x, y: planet.y, mass: planet.mass };
+      bodyVx = planet.vx;
+      bodyVy = planet.vy;
+    } else {
+      body = { x: system.star.x, y: system.star.y, mass: system.star.mass };
+      bodyVx = system.starVx;
+      bodyVy = system.starVy;
+    }
+  } else if (capture) {
+    const gcX = CONFIG.galaxy.centerX;
+    const gcY = CONFIG.galaxy.centerY;
+    const galAngle = capture.galPhase + capture.galOmega * world.globalTime;
+    const cx = gcX + Math.cos(galAngle) * capture.galR;
+    const cy = gcY + Math.sin(galAngle) * capture.galR;
+    
+    body = { x: cx, y: cy, mass: capture.star.mass };
+    bodyVx = -Math.sin(galAngle) * capture.galOmega * capture.galR;
+    bodyVy =  Math.cos(galAngle) * capture.galOmega * capture.galR;
+  }
+
+  if (!body) {
+    let { x, y, vx, vy } = ship;
+    const points = [{ x, y }];
+    for (let i = 0; i < horizonTicks; i++) {
+      x += vx * dt;
+      y += vy * dt;
+      if (i % sampleEvery === 0) points.push({ x, y });
+    }
+    return points;
+  }
+
+  let x = ship.x - body.x;
+  let y = ship.y - body.y;
+  let vx = ship.vx - bodyVx;
+  let vy = ship.vy - bodyVy;
+  
+  const points = [{ x: ship.x, y: ship.y }];
+
+  for (let i = 0; i < horizonTicks; i++) {
+    const g1 = gravityAt(x, y, [{ x: 0, y: 0, mass: body.mass }]);
+    vx += g1.ax * 0.5 * dt;
+    vy += g1.ay * 0.5 * dt;
+    x += vx * dt;
+    y += vy * dt;
+
+    const g2 = gravityAt(x, y, [{ x: 0, y: 0, mass: body.mass }]);
+    vx += g2.ax * 0.5 * dt;
+    vy += g2.ay * 0.5 * dt;
+
+    if (i % sampleEvery === 0) {
+      points.push({ x: x + body.x, y: y + body.y });
+    }
+  }
+
+  return points;
+}
+
+// Упрощенная версия: без гравитации, только кинематика и боковой газ.
+export function predictSideTrajectories(ship, world, stopDistance) {
+  const dt = 1;
+  const system = world.shipSystem;
+  
+  if (system) return null;
+
+  const ca = Math.cos(ship.angle);
+  const sa = Math.sin(ship.angle);
+  const rx = -sa, ry = ca;
+  
+  const maxTicks = Math.ceil(stopDistance / Math.max(0.1, Math.hypot(ship.vx, ship.vy))) + 100;
+
+  const makePath = (latDir) => {
+    let x = ship.x, y = ship.y, vx = ship.vx, vy = ship.vy;
+    const lat = CONFIG.physics.lateralAccel * latDir;
+    const tx = rx * lat, ty = ry * lat;
+    
+    const pts = [];
+    for (let i = 0; i < maxTicks; i++) {
+      vx += tx * dt;
+      vy += ty * dt;
+      x += vx * dt;
+      y += vy * dt;
+      
+      if (i % 20 === 0) pts.push({ x, y });
+      
+      if (Math.hypot(x - ship.x, y - ship.y) >= stopDistance) {
+        pts.push({ x, y });
+        break;
+      }
+    }
+    return pts;
+  };
+
+  return [ makePath(1), makePath(-1) ];
+}
+
+export function predictStopPoint(ship, world, dtRealSeconds) {
+  const dt = 1;
+  const system = world.shipSystem;
+  if (system) return null;
+
+  const capture = world.captureSystem;
+  const bodiesList = allBodies(system);
+
+  let { x, y, vx, vy } = ship;
+  let stopX = null, stopY = null;
+
+  for (let i = 0; i < 30000; i++) {
+    const ca = Math.cos(ship.angle);
+    const sa = Math.sin(ship.angle);
+    
+    const fwd = -CONFIG.physics.accel;
+    const tx = ca * fwd;
+    const ty = sa * fwd;
+
+    const g1 = gravityAt(x, y, bodiesList);
+    vx += (g1.ax + tx) * 0.5 * dt;
+    vy += (g1.ay + ty) * 0.5 * dt;
+    
+    if (!system && capture) {
+      const dx = capture.cx - x;
+      const dy = capture.cy - y;
+      const r = Math.hypot(dx, dy) || 1e-9;
+      const t = 1 - Math.min(1, (r - capture.influenceRadius) / (capture.captureRadius - capture.influenceRadius));
+      const strength = CONFIG.physics.G * capture.star.mass / (r * r) * t * 0.3;
+      vx += (dx / r) * strength * 0.5 * dt;
+      vy += (dy / r) * strength * 0.5 * dt;
+    }
+
+    x += vx * dt;
+    y += vy * dt;
+
+    const g2 = gravityAt(x, y, bodiesList);
+    vx += (g2.ax + tx) * 0.5 * dt;
+    vy += (g2.ay + ty) * 0.5 * dt;
+
+    if (!system && capture) {
+      const dx = capture.cx - x;
+      const dy = capture.cy - y;
+      const r = Math.hypot(dx, dy) || 1e-9;
+      const t = 1 - Math.min(1, (r - capture.influenceRadius) / (capture.captureRadius - capture.influenceRadius));
+      const strength = CONFIG.physics.G * capture.star.mass / (r * r) * t * 0.3;
+      vx += (dx / r) * strength * 0.5 * dt;
+      vy += (dy / r) * strength * 0.5 * dt;
+    }
+
+    const speed = Math.hypot(vx, vy);
+    if (speed < 0.05) {
+      stopX = x;
+      stopY = y;
+      break;
+    }
+  }
+
+  return stopX !== null ? { x: stopX, y: stopY } : null;
+}
+</file>
+
+<file path="public/js/core/profiler.js">
+// Профайлер кадра: замер времени каждой фазы + скользящее среднее.
+
+const SMOOTH = 30;
+const SMOOTH_TICK = 60;
+
+const averages = {
+  render: {},
+  frame: 0,
+};
+
+const _starts = {};
+const _fpsWindow = [];
+
+// Фиксированный порядок пунктов — чтобы панель не дёргалась.
+const RENDER_ORDER = [
+  'updateCharge',
+  'camTarget',
+  'bg',
+  'stars',
+  'distantSystems',
+  'currentSystem',
+  'trail',
+  'predCalc',
+  'predDraw',
+  'orbitHints',
+  'gravityLines',
+  'ship',
+  'autopilotUI',
+  'profiler',
+];
+
+const TICK_ORDER = [
+  'gen',
+  'shipSys',
+  'phys',
+  'advance',
+  'trail',
+];
+
+export function beginFrame(now) {
+  _frameStart = now;
+}
+let _frameStart = 0;
+
+export function addTick(name, durationMs) {
+  const key = `tick.${name}`;
+  const cur = averages.render[key];
+  averages.render[key] = cur === undefined
+    ? durationMs
+    : cur + (durationMs - cur) / SMOOTH_TICK;
+}
+
+export function addToAverage(name, durationMs) {
+  const cur = averages.render[name];
+  averages.render[name] = cur === undefined
+    ? durationMs
+    : cur + (durationMs - cur) / SMOOTH;
+}
+
+export function tStart(name) {
+  _starts[name] = performance.now();
+}
+
+export function tEnd(name) {
+  const s = _starts[name];
+  if (s === undefined) return 0;
+  const d = performance.now() - s;
+  addToAverage(name, d);
+  return d;
+}
+
+export function endFrame(now) {
+  const d = now - _frameStart;
+  averages.frame = averages.frame ? averages.frame + (d - averages.frame) / SMOOTH : d;
+  _fpsWindow.push(now);
+  while (_fpsWindow.length > 60) _fpsWindow.shift();
+}
+
+export function getStats() {
+  const w = _fpsWindow;
+  let fps = 0;
+  if (w.length >= 2) {
+    const dt = (w[w.length - 1] - w[0]) / (w.length - 1);
+    fps = dt > 0 ? 1000 / dt : 0;
+  }
+  return {
+    fps,
+    frameMs: averages.frame,
+    render: { ...averages.render },
+  };
+}
+
+export function drawProfiler(ctx, vp) {
+  const stats = getStats();
+
+  const lines = [];
+  lines.push({ text: `FPS: ${stats.fps.toFixed(1)}`, color: '#fff' });
+  lines.push({ text: `Frame: ${stats.frameMs.toFixed(2)} ms`, color: '#fff' });
+
+  lines.push({ text: `--- render ---`, color: '#8af' });
+  for (const name of RENDER_ORDER) {
+    const ms = stats.render[name];
+    if (ms === undefined) continue;
+    const color = ms > 2 ? '#faa' : '#aaa';
+    lines.push({ text: `  ${name}: ${ms.toFixed(2)}`, color });
+  }
+
+  lines.push({ text: `--- tick ---`, color: '#8af' });
+  for (const name of TICK_ORDER) {
+    const ms = stats.render[`tick.${name}`];
+    if (ms === undefined) continue;
+    const color = ms > 2 ? '#faa' : '#aaa';
+    lines.push({ text: `  ${name}: ${ms.toFixed(2)}`, color });
+  }
+
+  const lineHeight = 12;
+  const pad = 10;
+  const boxW = 220;
+  const boxH = lines.length * lineHeight + pad * 2;
+  const x = vp.width - boxW - 12;
+  const y = vp.height - boxH - 12;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(x, y, boxW, boxH);
+  ctx.strokeStyle = 'rgba(120, 200, 255, 0.3)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, boxW - 1, boxH - 1);
+
+  ctx.font = '11px "Consolas", "Courier New", monospace';
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  let ty = y + pad;
+  for (const { text, color } of lines) {
+    ctx.fillStyle = color;
+    ctx.fillText(text, x + pad, ty);
+    ty += lineHeight;
+  }
+  ctx.restore();
+}
+</file>
+
+<file path="public/js/core/state.js">
+import { createShip } from '../entities/ship.js';
+import { createWorld } from '../world/world.js';
+import { CONFIG } from '../config.js';
+
+const world = createWorld();
+const system = world.shipSystem;
+
+if (!system || !system.star) {
+  throw new Error("FATAL: Стартовая система не сгенерирована!");
+}
+
+const r = CONFIG.ship.startOrbit;
+const GM = CONFIG.physics.G * system.star.mass;
+const vCirc = Math.sqrt(GM / r);
+
+const cx = system.cx;
+const cy = system.cy;
+
+const starVx = system.starVx;
+const starVy = system.starVy;
+
+console.log('[state] start vCirc =', vCirc, 'system:', system.col, system.row, 'cx:', cx, 'cy:', cy);
+
+export const state = {
+  ship: {
+    ...createShip(), // Тут есть throttleMain и throttleLateral
+    x: cx + r,
+    y: cy,
+    vx: starVx,
+    vy: starVy + vCirc,
+    angle: Math.PI / 2,
+  },
+  world,
+  tickCount: 0,
+  viewport: { width: 0, height: 0, dpr: 1 },
+  trail: { points: [], maxPoints: 3000, sampleEvery: 4 },
+  autopilot: { charge: 0, ready: false, active: false, planet: null },
+};
+</file>
+
+<file path="public/js/entities/bodies.js">
+export function allBodies(system) {
+  if (!system) return [];
+  const arr = [system.star];
+  for (const p of system.planets) {
+    arr.push(p);
+    for (const m of p.moons) arr.push(m);
+  }
+  return arr;
+}
+
+export function dominantBody(system, x, y) {
+  if (!system) return null;
+  let best = null;
+  let bestDist = Infinity;
+  for (const p of system.planets) {
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (d < p.hill && d < bestDist) {
+      best = p;
+      bestDist = d;
+    }
+  }
+  return best;
+}
+</file>
+
+<file path="public/js/entities/ship.js">
+import { CONFIG } from '../config.js';
+
+export function createShip() {
+  return {
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    angle: CONFIG.ship.startAngle,
+    angularVel: 0,
+    radius: CONFIG.ship.radius,
+    impulse: 0,
+    timeWarpActive: false,
+    timeWarpScale: 1.0,
+    throttleMain: 0,
+    throttleLateral: 0,
+    _wasSpace: false, // Защита от undefined
+  };
+}
+</file>
+
+<file path="public/js/entities/systemGenerator.js">
+import { CONFIG } from '../config.js';
+
+export function hashCoords(col, row, gseed) {
+  let h = gseed | 0;
+  h = (h ^ Math.imul(col, 374761393)) | 0;
+  h = (h ^ Math.imul(row, 668265263)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177) | 0;
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
+export function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function randRange(rng, min, max) { return min + rng() * (max - min); }
+function randInt(rng, min, max)   { return Math.floor(randRange(rng, min, max + 1)); }
+
+function randColor(rng) {
+  const h = Math.floor(rng() * 360);
+  const s = 40 + Math.floor(rng() * 30);
+  const l = 50 + Math.floor(rng() * 20);
+  return `hsl(${h}, ${s}%, ${l}%)`;
+}
+
+function randStarColor(rng) {
+  const pick = rng();
+  let h;
+  if (pick < 0.25) h = randRange(rng, 0, 20);
+  else if (pick < 0.75) h = randRange(rng, 30, 60);
+  else h = randRange(rng, 200, 240);
+  const s = 55 + Math.floor(rng() * 25);
+  const l = 60 + Math.floor(rng() * 20);
+  return `hsl(${Math.round(h)}, ${s}%, ${l}%)`;
+}
+
+function buildSystem(seed, cx, cy) {
+  const rng = mulberry32(seed);
+  const G = CONFIG.physics.G;
+
+  const starMass = randRange(rng, 8000, 20000);
+  const starRadius = 40 + starMass / 200;
+  const starColor = randStarColor(rng);
+
+  const n = randInt(rng, 2, 7);
+  const innerOrbit = randRange(rng, 600, 1200);
+  const outerOrbit = randRange(rng, 8000, 16000);
+  const ratio = Math.pow(outerOrbit / innerOrbit, 1 / Math.max(1, n - 1));
+
+  const planets = [];
+  for (let i = 0; i < n; i++) {
+    const orbit = innerOrbit * Math.pow(ratio, i);
+    const mass = randRange(rng, 20, 320);
+    const radius = Math.max(6, Math.min(42, 4 + Math.cbrt(mass) * 3));
+    const phase = rng() * Math.PI * 2;
+    const omega = Math.sqrt((G * starMass) / (orbit ** 3));
+    const hill = orbit * Math.cbrt(mass / (3 * starMass));
+
+    const moonCount = Math.floor(rng() * 11);
+    const moons = [];
+    const maxMoonOrbit = Math.max(radius + 8, hill * 0.4);
+
+    for (let j = 0; j < moonCount; j++) {
+      const minOrbit = radius + 6;
+      const t = rng();
+      const moonOrbit = minOrbit + (maxMoonOrbit - minOrbit) * t;
+      const moonMass = randRange(rng, 0.05, 1.0);
+      const moonRadius = randRange(rng, 1, Math.min(4, radius * 0.3));
+      const moonPhase = rng() * Math.PI * 2;
+      const moonOmega = Math.sqrt((G * mass) / (moonOrbit ** 3));
+
+      moons.push({
+        name: `P${i + 1}M${j + 1}`,
+        mass: moonMass, radius: moonRadius, orbit: moonOrbit, phase: moonPhase, omega: moonOmega,
+        color: randColor(rng),
+        x: 0, y: 0, vx: 0, vy: 0,
+      });
+    }
+
+    planets.push({
+      name: `P${i + 1}`, mass, radius, orbit, phase, omega,
+      color: randColor(rng),
+      x: 0, y: 0, vx: 0, vy: 0,
+      hill, moons,
+    });
+  }
+
+  const gcX = CONFIG.galaxy.centerX;
+  const gcY = CONFIG.galaxy.centerY;
+  const dxGC = cx - gcX;
+  const dyGC = cy - gcY;
+  const galR = Math.hypot(dxGC, dyGC);
+  const galPhase = Math.atan2(dyGC, dxGC);
+  const galOmega = CONFIG.galaxy.omega;
+
+  const outerPlanetOrbit = innerOrbit * Math.pow(ratio, n - 1);
+  const influenceRadius = Math.max(outerPlanetOrbit * 1.3, starRadius * 10);
+  const captureRadius = influenceRadius * CONFIG.world.captureMultiplier;
+
+  console.log("[generator] buildSystem cx:", cx, "cy:", cy, "mass:", starMass); return {
+    seed, cx: 0, cy: 0, starVx: 0, starVy: 0, baseX: cx, baseY: cy,
+    galR, galPhase, galOmega,
+    star: {
+      name: `STAR_${seed}`, mass: starMass, radius: starRadius, color: starColor,
+      x: 0, y: 0, vx: 0, vy: 0, isStar: true,
+    },
+    planets, influenceRadius, captureRadius, worldTime: 0,
+  };
+}
+
+export function generateSystemsInCell(col, row, gseed) {
+  const cell = CONFIG.world.cellSize;
+  const isStart = (col === CONFIG.world.startCol && row === CONFIG.world.startRow);
+  const result = [];
+
+  for (let dcol = -1; dcol <= 1; dcol++) {
+    for (let drow = -1; drow <= 1; drow++) {
+      const nc = col + dcol;
+      const nr = row + drow;
+      const nseed = hashCoords(nc, nr, gseed);
+      const rng = mulberry32(nseed);
+
+      const count = Math.floor(rng() * 2);
+
+      for (let i = 0; i < count; i++) {
+        const x = nc * cell - cell * 0.5 + rng() * 2 * cell;
+        const y = nr * cell - cell * 0.5 + rng() * 2 * cell;
+
+        const cxCell = Math.floor(x / cell);
+        const cyCell = Math.floor(y / cell);
+        if (cxCell !== col || cyCell !== row) continue;
+
+        const seed = hashCoords(nc, nr, gseed) + i * 100000;
+        const sys = buildSystem(seed, x, y);
+        result.push(sys);
+      }
+    }
+  }
+
+  // Если это стартовая ячейка и мы ничего не создали — форсим одну систему.
+  if (isStart && result.length === 0) {
+    const seed = hashCoords(col, row, gseed);
+    const x = col * cell + cell / 2;
+    const y = row * cell + cell / 2;
+    const sys = buildSystem(seed, x, y);
+    result.push(sys);
+  }
+
+  return result;
+}
+</file>
+
+<file path="public/js/input/controls.js">
+export const input = {
+  thrust: false,
+  reverse: false,
+  turnLeft: false,
+  turnRight: false,
+  space: false,
+};
+
+export function bindControls({ btnThrust, btnReverse, btnLeft, btnRight }) {
+  const set = (key, value, btn) => {
+    input[key] = value;
+    if (btn) btn.classList.toggle('active', value);
+  };
+
+  const bindButton = (btn, key) => {
+    if (!btn) return;
+    const on  = (e) => { e.preventDefault(); set(key, true, btn); };
+    const off = (e) => { if (e) e.preventDefault(); set(key, false, btn); };
+
+    btn.addEventListener('mousedown', on);
+    btn.addEventListener('mouseup', off);
+    btn.addEventListener('mouseleave', off);
+    btn.addEventListener('touchstart', on, { passive: false });
+    btn.addEventListener('touchend', off, { passive: false });
+    btn.addEventListener('touchcancel', off, { passive: false });
+  };
+
+  bindButton(btnThrust, 'thrust');
+  bindButton(btnReverse, 'reverse');
+  bindButton(btnLeft, 'turnLeft');
+  bindButton(btnRight, 'turnRight');
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyW' || e.code === 'ArrowUp')    set('thrust',    true,  btnThrust);
+    if (e.code === 'KeyS' || e.code === 'ArrowDown')  set('reverse',   true,  btnReverse);
+    if (e.code === 'KeyA' || e.code === 'ArrowLeft')  set('turnLeft',  true,  btnLeft);
+    if (e.code === 'KeyD' || e.code === 'ArrowRight') set('turnRight', true,  btnRight);
+    if (e.code === 'Space') {
+      e.preventDefault();
+      input.space = true;
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'KeyW' || e.code === 'ArrowUp')    set('thrust',    false, btnThrust);
+    if (e.code === 'KeyS' || e.code === 'ArrowDown')  set('reverse',   false, btnReverse);
+    if (e.code === 'KeyA' || e.code === 'ArrowLeft')  set('turnLeft',  false, btnLeft);
+    if (e.code === 'KeyD' || e.code === 'ArrowRight') set('turnRight', false, btnRight);
+    if (e.code === 'Space') {
+      e.preventDefault();
+      input.space = false;
+    }
+  });
+}
+</file>
+
+<file path="public/js/input/wheel.js">
+import { CONFIG } from '../config.js';
+
+// Колесо мыши → изменение зума. Экспортирует объект camera,
+// который читает рендер.
+export const camera = { zoom: 1 };
+
+export function bindWheel(canvasEl) {
+  const { zoomMin, zoomMax, zoomStep } = CONFIG.camera;
+
+  canvasEl.addEventListener('wheel', (e) => {
+    e.preventDefault();
+
+    // deltaY < 0 — колесо от себя (приближение), > 0 — на себя (отдаление).
+    // Нормализуем по знаку, а не по величине — шаг всегда одинаковый.
+    const factor = e.deltaY < 0 ? zoomStep : 1 / zoomStep;
+    camera.zoom = Math.min(zoomMax, Math.max(zoomMin, camera.zoom * factor));
+  }, { passive: false });
+}
+</file>
+
+<file path="public/js/render/autopilotUI.js">
+import { CONFIG } from '../config.js';
+
+export function drawAutopilotUI(ctx, vp, state, now) {
+  const ap = state.autopilot;
+  const cx = vp.width / 2;
+  const cy = vp.height / 2;
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  if (ap.charge > 0 && !ap.ready) {
+    const left = CONFIG.autopilot.chargeTime - ap.charge;
+    ctx.font = 'bold 64px "Segoe UI", system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(120, 200, 255, 0.9)';
+    ctx.shadowColor = 'rgba(120, 200, 255, 0.9)';
+    ctx.shadowBlur = 20;
+    ctx.fillText(left.toFixed(3) + ' с', cx, cy - 100);
+    ctx.shadowBlur = 0;
+    ctx.font = '16px "Segoe UI", system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(180, 220, 255, 0.7)';
+    ctx.fillText('ЗАРЯДКА АВТОПИЛОТА', cx, cy - 60);
+  }
+
+  if (ap.ready && !ap.active) {
+    const pulse = 0.6 + 0.4 * Math.sin(now / 200);
+    ctx.font = 'bold 28px "Segoe UI", system-ui, sans-serif';
+    ctx.fillStyle = `rgba(255, 220, 80, ${pulse})`;
+    ctx.shadowColor = 'rgba(255, 220, 80, 0.9)';
+    ctx.shadowBlur = 15;
+    ctx.fillText('[ ПРОБЕЛ — АВТОПАРКОВКА ]', cx, cy - 100);
+    ctx.shadowBlur = 0;
+  }
+
+  if (ap.active) {
+    const blink = 0.5 + 0.5 * Math.sin(now / 180);
+    ctx.font = 'bold 56px "Segoe UI", system-ui, sans-serif';
+    ctx.fillStyle = `rgba(120, 255, 160, ${0.4 + 0.6 * blink})`;
+    ctx.shadowColor = 'rgba(120, 255, 160, 1)';
+    ctx.shadowBlur = 25;
+    ctx.fillText('АВТОПАРКОВКА', cx, cy - 100);
+    ctx.shadowBlur = 0;
+    ctx.font = '16px "Segoe UI", system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(180, 255, 200, 0.8)';
+    ctx.fillText('отпустите ПРОБЕЛ для выхода', cx, cy - 60);
+  }
+
+  ctx.restore();
+}
+</file>
+
+<file path="public/js/render/bodies.js">
+import { CONFIG } from '../config.js';
+
+export function drawBodies(ctx, system, camX, camY, viewport) {
+  if (!system) return;
+
+  const m = ctx.getTransform();
+  const zoom = Math.max(Math.hypot(m.a, m.b), 1e-6);
+  const halfW = (viewport.width / 2) / zoom;
+  const halfH = (viewport.height / 2) / zoom;
+
+  const visible = (b, margin) =>
+    Math.abs(b.x - camX) < halfW + margin &&
+    Math.abs(b.y - camY) < halfH + margin;
+
+  drawOrbits(ctx, system, halfW, halfH, camX, camY);
+
+  if (visible(system.star, system.star.radius * 8)) {
+    drawStar(ctx, system.star);
+  }
+
+  for (const p of system.planets) {
+    if (visible(p, p.hill)) {
+      drawHill(ctx, p);
+      drawMiniHill(ctx, p);
+      drawPlanet(ctx, p);
+
+      for (const moon of p.moons) {
+        const px = moon.x - camX;
+        const py = moon.y - camY;
+        if (Math.abs(px) > halfW + moon.radius) continue;
+        if (Math.abs(py) > halfH + moon.radius) continue;
+        const r = Math.max(moon.radius, 1 / zoom);
+        ctx.fillStyle = moon.color;
+        ctx.beginPath();
+        ctx.arc(moon.x, moon.y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+}
+
+function drawOrbits(ctx, system, halfW, halfH, camX, camY) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(140, 180, 255, 0.12)';
+  ctx.lineWidth = 1 / Math.max(
+    Math.hypot(ctx.getTransform().a, ctx.getTransform().b), 1e-6
+  );
+  const diag = Math.hypot(halfW, halfH);
+  const dcx = camX - system.cx;
+  const dcy = camY - system.cy;
+  const d = Math.hypot(dcx, dcy);
+
+  for (const p of system.planets) {
+    if (p.orbit + diag < d) continue;
+    if (d < p.orbit - diag) continue;
+    if (Math.abs(d - p.orbit) > diag) continue;
+    ctx.beginPath();
+    ctx.arc(system.cx, system.cy, p.orbit, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawHill(ctx, p) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(120, 200, 255, 0.18)';
+  ctx.setLineDash([4, 6]);
+  ctx.lineWidth = 1 / Math.max(
+    Math.hypot(ctx.getTransform().a, ctx.getTransform().b), 1e-6
+  );
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, p.hill, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawMiniHill(ctx, p) {
+  const miniR = p.hill * CONFIG.autopilot.miniHillFraction;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 220, 80, 0.25)';
+  ctx.setLineDash([3, 5]);
+  ctx.lineWidth = 1 / Math.max(
+    Math.hypot(ctx.getTransform().a, ctx.getTransform().b), 1e-6
+  );
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, miniR, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawStar(ctx, s) {
+  const grad = ctx.createRadialGradient(s.x, s.y, s.radius * 0.4, s.x, s.y, s.radius * 8);
+  grad.addColorStop(0, 'rgba(255, 220, 160, 0.9)');
+  grad.addColorStop(0.4, 'rgba(255, 180, 100, 0.35)');
+  grad.addColorStop(1, 'rgba(255, 180, 100, 0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, s.radius * 8, 0, Math.PI * 2);
+  ctx.fill();
+
+  const core = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.radius);
+  core.addColorStop(0, '#fffbe8');
+  core.addColorStop(0.6, s.color);
+  core.addColorStop(1, s.color);
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawPlanet(ctx, p) {
+  const dx = p.x;
+  const dy = p.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const lx = -dx / dist;
+  const ly = -dy / dist;
+
+  const base = ctx.createRadialGradient(
+    p.x + lx * p.radius, p.y + ly * p.radius, p.radius * 0.1,
+    p.x, p.y, p.radius
+  );
+  base.addColorStop(0, lighten(p.color, 0.35));
+  base.addColorStop(1, darken(p.color, 0.55));
+  ctx.fillStyle = base;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function parseHsl(str) {
+  const m = /hsl\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*\)/.exec(str);
+  if (!m) return { h: 200, s: 60, l: 60 };
+  return { h: parseFloat(m[1]), s: parseFloat(m[2]), l: parseFloat(m[3]) };
+}
+
+function lighten(hsl, k) {
+  const { h, s, l } = parseHsl(hsl);
+  const nl = Math.min(95, l + (95 - l) * k);
+  return `hsl(${h}, ${s}%, ${nl}%)`;
+}
+
+function darken(hsl, k) {
+  const { h, s, l } = parseHsl(hsl);
+  const nl = Math.max(5, l - l * k);
+  return `hsl(${h}, ${s}%, ${nl}%)`;
+}
+</file>
+
+<file path="public/js/render/canvas.js">
+import { CONFIG } from '../config.js';
+
+// Управление canvas: размер с учётом DPR, ресайз, контекст.
+export function createCanvas(canvasEl) {
+  const ctx = canvasEl.getContext('2d');
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    canvasEl.width  = Math.floor(w * dpr);
+    canvasEl.height = Math.floor(h * dpr);
+    canvasEl.style.width  = w + 'px';
+    canvasEl.style.height = h + 'px';
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { width: w, height: h, dpr };
+  }
+
+  function clear() {
+    const { width, height } = ctx.canvas;
+    ctx.clearRect(0, 0, width, height);
+  }
+
+  function drawBackground({ width, height }) {
+    ctx.fillStyle = CONFIG.bg.base;
+    ctx.fillRect(0, 0, width, height);
+
+    const r = Math.max(width, height) * 0.75;
+    const grad = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, r);
+    grad.addColorStop(0, CONFIG.bg.glowInner);
+    grad.addColorStop(1, CONFIG.bg.glowOuter);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  return { ctx, resize, clear, drawBackground };
+}
+</file>
+
+<file path="public/js/render/hud.js">
+import { CONFIG } from '../config.js';
+import { circularSpeed } from './orbitHints.js';
+
+const MONTH_NAMES = [
+  'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+];
+const DAY_NAMES = [
+  'вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'
+];
+
+const TICKS_PER_DAY = (100000 / 120) / 30.4375;
+
+export function createHud() {
+  const elSpeed   = document.getElementById('speed');
+  const elTick    = document.getElementById('tick');
+  const elPosX    = document.getElementById('posX');
+  const elPosY    = document.getElementById('posY');
+  const elZoom    = document.getElementById('zoom');
+  const elSphere  = document.getElementById('sphere');
+  const elOrbital = document.getElementById('orbital');
+  const elAge     = document.getElementById('age');
+  const elTimeRate= document.getElementById('timerate');
+  const elDate    = document.getElementById('date');
+
+  function update(ship, tickCount, zoom, system, planet, timeScale) {
+    elSpeed.textContent = Math.hypot(ship.vx, ship.vy).toFixed(2);
+    elTick.textContent  = tickCount;
+    elPosX.textContent  = ship.x.toFixed(0);
+    elPosY.textContent  = ship.y.toFixed(0);
+    if (elZoom) elZoom.textContent = zoom.toFixed(3);
+    if (elSphere) elSphere.textContent = planet ? planet.name : '—';
+
+    // Время: старт 5027 г, 1 апреля.
+    if (elDate) {
+      const totalDays = Math.floor(tickCount / TICKS_PER_DAY);
+      
+      let year = 5027;
+      let monthIdx = 3; // апрель
+      let day = 1 + totalDays;
+      
+      const daysInMonths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      
+      while (true) {
+        const dim = daysInMonths[monthIdx];
+        if (day <= dim) break;
+        day -= dim;
+        monthIdx++;
+        if (monthIdx >= 12) { monthIdx = 0; year++; }
+      }
+
+      const dow = (2 + totalDays) % 7;
+      
+      elDate.textContent = `${day} ${MONTH_NAMES[monthIdx]} ${year}, ${DAY_NAMES[dow]}`;
+    }
+
+    // Возраст в годах и месяцах.
+    if (elAge) {
+      const totalYears = 20 + (tickCount / 100000) * 10;
+      const years = Math.floor(totalYears);
+      const months = Math.floor((totalYears - years) * 12);
+      elAge.textContent = `${years} г. ${months} мес.`;
+    }
+    
+    // Темп времени.
+    if (elTimeRate) {
+      elTimeRate.textContent = `x${timeScale.toFixed(2)}`;
+      elTimeRate.style.color = timeScale < 0.9 ? '#ffb08a' : '#7fffd4';
+    }
+
+    if (!elOrbital) return;
+    if (!planet) {
+      elOrbital.textContent = '—';
+      elOrbital.style.color = '';
+      return;
+    }
+
+    const rx = ship.x - planet.x;
+    const ry = ship.y - planet.y;
+    const r = Math.hypot(rx, ry) || 1e-9;
+    const ux = rx / r;
+    const uy = ry / r;
+    const rvx = ship.vx - planet.vx;
+    const rvy = ship.vy - planet.vy;
+
+    const vRad  = rvx * ux + rvy * uy;
+    const vTan  = rvx * (-uy) + rvy * ux;
+    const vCirc = circularSpeed(planet.mass, r);
+
+    const tol = vCirc * 0.01;
+    const ok = Math.abs(vRad) < tol && Math.abs(Math.abs(vTan) - vCirc) < tol;
+
+    elOrbital.textContent =
+      `rad ${vRad.toFixed(3)}  tan ${vTan.toFixed(3)}  circ ${vCirc.toFixed(3)}`;
+    elOrbital.style.color = ok ? '#7dffa8' : '#ffb08a';
+  }
+
+  return { update };
+}
+</file>
+
+<file path="public/js/render/impulseBar.js">
+import { CONFIG } from '../config.js';
+
+export function drawImpulseBar(ctx, ship, screenX, screenY) {
+  const impulse = ship.impulse;
+  const isFull = impulse >= CONFIG.impulse.maxCharge - 0.01;
+
+  const H = 120;
+  const W = 8;
+  const x = screenX - 40;
+  const y = screenY - H / 2;
+
+  ctx.save();
+
+  ctx.fillStyle = 'rgba(20, 30, 50, 0.7)';
+  ctx.fillRect(x - 1, y - 1, W + 2, H + 2);
+
+  const filled = (impulse / CONFIG.impulse.maxCharge) * H;
+  
+  if (isFull) {
+    const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 150);
+    ctx.fillStyle = `rgba(255, 60, 60, ${pulse})`;
+    ctx.shadowColor = 'rgba(255, 60, 60, 0.8)';
+    ctx.shadowBlur = 10;
+  } else {
+    ctx.fillStyle = impulse > 0 ? '#7fffd4' : 'rgba(120, 160, 200, 0.2)';
+    ctx.shadowBlur = 0;
+  }
+  
+  ctx.fillRect(x, y + H - filled, W, filled);
+  ctx.shadowBlur = 0;
+
+  ctx.strokeStyle = 'rgba(120, 200, 255, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, W - 1, H - 1);
+
+  ctx.fillStyle = isFull ? '#ff6060' : 'rgba(200, 220, 255, 0.7)';
+  ctx.font = '10px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('Hold space!', x + W / 2, y - 4);
+
+  ctx.restore();
+}
+</file>
+
+<file path="public/js/render/orbitHints.js">
+import { CONFIG } from '../config.js';
+
+export function circularSpeed(planetMass, r) {
+  const G = CONFIG.physics.G;
+  const soft2 = CONFIG.physics.softening ** 2;
+  const r2 = r * r;
+  return Math.sqrt((G * planetMass * r2) / Math.pow(r2 + soft2, 1.5));
+}
+
+export function drawOrbitHints(ctx, ship, planet, system) {
+  const m = ctx.getTransform();
+  const zoom = Math.max(Math.hypot(m.a, m.b), 1e-6);
+
+  // === Нормаль к орбите ===
+  // Вектор от звезды к кораблю.
+  const angleToShip = Math.atan2(ship.y - system.cy, ship.x - system.cx);
+  // Точка на орбите планеты.
+  const targetX = system.cx + Math.cos(angleToShip) * planet.orbit;
+  const targetY = system.cy + Math.sin(angleToShip) * planet.orbit;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(ship.x, ship.y);
+  ctx.lineTo(targetX, targetY);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; // Нормаль белая
+  ctx.lineWidth = 1.5 / zoom;
+  ctx.setLineDash([4 / zoom, 4 / zoom]);
+  ctx.stroke();
+  ctx.restore();
+
+  // === Остальная логика стрелок (как было) ===
+  const rx = ship.x - planet.x;
+  const ry = ship.y - planet.y;
+  const r = Math.hypot(rx, ry) || 1e-9;
+  const ux = rx / r;
+  const uy = ry / r;
+
+  const rvx = ship.vx - planet.vx;
+  const rvy = ship.vy - planet.vy;
+
+  const vCirc = circularSpeed(planet.mass, r);
+
+  const vTanProj = rvx * (-uy) + rvy * ux;
+  const sign = vTanProj >= 0 ? 1 : -1;
+  const tvx = -uy * sign;
+  const tvy =  ux * sign;
+
+  const cvx = tvx * vCirc;
+  const cvy = tvy * vCirc;
+  const dvx = cvx - rvx;
+  const dvy = cvy - rvy;
+
+  const midX = (ship.x + planet.x) / 2;
+  const midY = (ship.y + planet.y) / 2;
+  const half = r * 0.6;
+  const stepPx = 24;
+  const stepWorld = stepPx / zoom;
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(120, 180, 220, 0.18)';
+  ctx.lineWidth = 1 / zoom;
+
+  const startX = midX - Math.floor(half / stepWorld) * stepWorld;
+  for (let x = startX; x <= midX + half; x += stepWorld) {
+    ctx.beginPath();
+    ctx.moveTo(x, midY - half);
+    ctx.lineTo(x, midY + half);
+    ctx.stroke();
+  }
+  const startY = midY - Math.floor(half / stepWorld) * stepWorld;
+  for (let y = startY; y <= midY + half; y += stepWorld) {
+    ctx.beginPath();
+    ctx.moveTo(midX - half, y);
+    ctx.lineTo(midX + half, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const pixelLen = 60 / zoom;
+  const scale = vCirc > 1e-9 ? pixelLen / vCirc : 0;
+  const minLenPx = 18 / zoom;
+
+  drawArrow(ctx, ship.x, ship.y, rvx, rvy, scale, minLenPx, 'rgba(255, 90, 90, 0.95)', zoom);
+  drawArrow(ctx, ship.x, ship.y, cvx, cvy, scale, minLenPx, 'rgba(90, 255, 130, 0.95)', zoom);
+  drawArrow(ctx, ship.x, ship.y, dvx, dvy, scale, minLenPx, 'rgba(255, 220, 80, 0.95)', zoom);
+}
+
+function drawArrow(ctx, x0, y0, vx, vy, scale, minLen, color, zoom) {
+  let dx = vx * scale;
+  let dy = vy * scale;
+  let len = Math.hypot(dx, dy);
+
+  const vLen = Math.hypot(vx, vy);
+  if (vLen < 1e-9) return;
+
+  if (len < minLen) {
+    const ux = dx / len;
+    const uy = dy / len;
+    dx = ux * minLen;
+    dy = uy * minLen;
+    len = minLen;
+  }
+
+  const ux = dx / len;
+  const uy = dy / len;
+  const x1 = x0 + dx;
+  const y1 = y0 + dy;
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2.5 / zoom;
+  ctx.lineCap = 'round';
+
+  ctx.setLineDash([6 / zoom, 4 / zoom]);
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const headLen = 10 / zoom;
+  const headW = 6 / zoom;
+  const bx = x1 - ux * headLen;
+  const by = y1 - uy * headLen;
+  const px = -uy * headW;
+  const py =  ux * headW;
+
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(bx + px, by + py);
+  ctx.lineTo(bx - px, by - py);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+</file>
+
+<file path="public/js/render/prediction.js">
+import { CONFIG } from '../config.js';
+
+const MONTH_NAMES_SHORT = [
+  'янв', 'фев', 'мар', 'апр', 'мая', 'июн',
+  'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'
+];
+const TICKS_PER_MONTH = 100000 / 120;
+
+export function drawPrediction(ctx, points, currentTick, thrusting, camAngle, stopPoint, inHill, sidePaths) {
+  if (!points || points.length < 3) return;
+
+  const maxPts = CONFIG.prediction.maxPoints;
+  const step = Math.max(1, Math.ceil(points.length / maxPts));
+  const pts = [];
+  for (let i = 0; i < points.length; i += step) pts.push(points[i]);
+  if (pts[pts.length - 1] !== points[points.length - 1]) {
+    pts.push(points[points.length - 1]);
+  }
+  if (pts.length < 3) return;
+
+  const first = pts[0];
+  const last = pts[pts.length - 1];
+
+  if (!Number.isFinite(first.x) || !Number.isFinite(first.y) || 
+      !Number.isFinite(last.x) || !Number.isFinite(last.y)) {
+    return;
+  }
+
+  const m = ctx.getTransform();
+  const zoom = Math.max(Math.hypot(m.a, m.b), 1e-6);
+
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  // === Отрисовка боковых траекторий (пунктиром) ===
+  if (sidePaths) {
+    for (const path of sidePaths) {
+      if (!path || path.length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(path[0].x, path[0].y);
+      for (let i = 1; i < path.length; i++) {
+        ctx.lineTo(path[i].x, path[i].y);
+      }
+      ctx.strokeStyle = 'rgba(255, 150, 150, 0.4)';
+      ctx.lineWidth = 1.5 / zoom;
+      ctx.setLineDash([4 / zoom, 4 / zoom]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // === Основная линия предикции ===
+  const grad = ctx.createLinearGradient(first.x, first.y, last.x, last.y);
+  const a = thrusting ? 0.95 : 0.8;
+  grad.addColorStop(0, `rgba(255, 70, 70, ${a})`);
+  grad.addColorStop(1, `rgba(255, 70, 70, 0)`);
+
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = 3.5 / zoom;
+  ctx.beginPath();
+  ctx.moveTo(first.x, first.y);
+
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mx = (pts[i].x + pts[i + 1].x) * 0.5;
+    const my = (pts[i].y + pts[i + 1].y) * 0.5;
+    ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+  }
+  ctx.lineTo(last.x, last.y);
+  ctx.stroke();
+
+  // Засечки месяцев (только не в сфере Хилла)
+  if (!inHill) {
+    const ticksAhead = CONFIG.prediction.horizon;
+    const firstNextMonthTick = Math.ceil((currentTick + 1) / TICKS_PER_MONTH) * TICKS_PER_MONTH;
+    const startMonthIndex = 3;
+    const startYear = 5027;
+
+    ctx.font = `${12 / zoom}px "Segoe UI", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let tick = firstNextMonthTick; tick <= currentTick + ticksAhead; tick += TICKS_PER_MONTH) {
+      const progress = (tick - currentTick) / ticksAhead;
+      const ptIndex = progress * (pts.length - 1);
+      const i0 = Math.floor(ptIndex);
+      const i1 = Math.min(i0 + 1, pts.length - 1);
+      if (i0 < 0 || i0 >= pts.length - 1) continue;
+      
+      const k = ptIndex - i0;
+      const px = pts[i0].x + (pts[i1].x - pts[i0].x) * k;
+      const py = pts[i0].y + (pts[i1].y - pts[i0].y) * k;
+      
+      const dx = pts[i1].x - pts[i0].x;
+      const dy = pts[i1].y - pts[i0].y;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len;
+      const ny = dx / len;
+      
+      const tickSize = 6 / zoom;
+      
+      ctx.beginPath();
+      ctx.moveTo(px - nx * tickSize, py - ny * tickSize);
+      ctx.lineTo(px + nx * tickSize, py + ny * tickSize);
+      ctx.strokeStyle = `rgba(255, 100, 100, ${a * (1 - progress)})`;
+      ctx.lineWidth = 2 / zoom;
+      ctx.stroke();
+
+      const monthsTotal = Math.floor(tick / TICKS_PER_MONTH);
+      const mIndex = (startMonthIndex + monthsTotal) % 12;
+      const year = startYear + Math.floor((startMonthIndex + monthsTotal) / 12);
+      
+      const monthStr = MONTH_NAMES_SHORT[mIndex];
+      const yearStr = String(year).slice(-2);
+      const label = `${monthStr} ${yearStr}`;
+      
+      ctx.save();
+      ctx.translate(px + (12 / zoom), py);
+      ctx.rotate(Math.PI / 2 + camAngle);
+      ctx.fillStyle = `rgba(255, 180, 180, ${a * (1 - progress) * 0.8})`;
+      ctx.fillText(label, 0, 0);
+      ctx.restore();
+    }
+  }
+
+  // Окружность остановки (STOP)
+  if (stopPoint) {
+    const dx = stopPoint.x - first.x;
+    const dy = stopPoint.y - first.y;
+    const radius = Math.hypot(dx, dy);
+
+    if (radius > 0.1 && Number.isFinite(radius)) {
+      ctx.beginPath();
+      ctx.arc(first.x, first.y, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255, 80, 80, 0.4)';
+      ctx.lineWidth = 1.5 / zoom;
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(255, 80, 80, 0.7)';
+      ctx.font = `bold ${10 / zoom}px "Segoe UI", system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      const numLabels = 12;
+      for (let i = 0; i < numLabels; i++) {
+        const angle = (i / numLabels) * Math.PI * 2;
+        const tx = first.x + Math.cos(angle) * radius;
+        const ty = first.y + Math.sin(angle) * radius;
+        
+        ctx.save();
+        ctx.translate(tx, ty);
+        ctx.rotate(Math.PI / 2 + camAngle); 
+        ctx.fillText('STOP', 0, 0);
+        ctx.restore();
+      }
+
+      ctx.beginPath();
+      ctx.arc(stopPoint.x, stopPoint.y, 5 / zoom, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 80, 80, 0.9)';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2 / zoom;
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+</file>
+
+<file path="public/js/render/ship.js">
+import { CONFIG } from '../config.js';
+
+export function drawShip(ctx, ship, input) {
+  const m = ctx.getTransform();
+  const zoom = Math.max(Math.hypot(m.a, m.b), 1e-6);
+
+  const worldPx = ship.radius * zoom;
+  const s = Math.max(1, CONFIG.ship.minScreenRadius / worldPx);
+
+  ctx.save();
+  ctx.translate(ship.x, ship.y);
+  ctx.rotate(ship.angle);
+  ctx.scale(s, s);
+
+  const r = ship.radius;
+  const tMain = ship.throttleMain;
+  const tLat  = ship.throttleLateral;
+
+  // Задний двигатель / реверс (пропорционально throttle).
+  if (Math.abs(tMain) > 0.03) {
+    const flameLen = (14 + Math.random() * 6) * Math.abs(tMain);
+    const grad = ctx.createLinearGradient(-r, 0, -r - flameLen, 0);
+    if (tMain > 0) {
+      grad.addColorStop(0,   'rgba(120, 220, 255, 0.95)');
+      grad.addColorStop(0.5, 'rgba(80, 160, 255, 0.6)');
+      grad.addColorStop(1,   'rgba(80, 160, 255, 0)');
+    } else {
+      grad.addColorStop(0,   'rgba(255, 180, 120, 0.95)');
+      grad.addColorStop(0.5, 'rgba(255, 120, 80, 0.6)');
+      grad.addColorStop(1,   'rgba(255, 120, 80, 0)');
+    }
+    const w = 4 * Math.abs(tMain) + 1;
+    ctx.beginPath();
+    ctx.moveTo(-r + 2, -w);
+    ctx.lineTo(-r - flameLen, 0);
+    ctx.lineTo(-r + 2, w);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
+  // Боковые сопла (пропорционально throttle).
+  if (Math.abs(tLat) > 0.03) {
+    const flameLen = (10 + Math.random() * 6) * Math.abs(tLat);
+    const side = tLat > 0 ? -1 : 1;
+    const grad = ctx.createLinearGradient(0, side * r, 0, side * (r + flameLen));
+    grad.addColorStop(0,   'rgba(255, 220, 120, 0.95)');
+    grad.addColorStop(0.5, 'rgba(255, 180, 80, 0.6)');
+    grad.addColorStop(1,   'rgba(255, 180, 80, 0)');
+
+    const w = 3 * Math.abs(tLat) + 1;
+    ctx.beginPath();
+    ctx.moveTo(-w, side * (r - 1));
+    ctx.lineTo(0,  side * (r + flameLen));
+    ctx.lineTo(w,  side * (r - 1));
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
+  // Корпус.
+  ctx.beginPath();
+  ctx.moveTo(r, 0);
+  ctx.lineTo(-r * 0.75, -r * 0.7);
+  ctx.lineTo(-r * 0.4, 0);
+  ctx.lineTo(-r * 0.75, r * 0.7);
+  ctx.closePath();
+
+  const bodyGrad = ctx.createLinearGradient(-r, 0, r, 0);
+  bodyGrad.addColorStop(0, '#1e3a5f');
+  bodyGrad.addColorStop(1, '#9fd9ff');
+  ctx.fillStyle = bodyGrad;
+  ctx.strokeStyle = '#cfefff';
+  ctx.lineWidth = 1.5;
+  ctx.fill();
+  ctx.stroke();
+
+  // Кабина.
+  ctx.beginPath();
+  ctx.arc(r * 0.15, 0, r * 0.25, 0, Math.PI * 2);
+  ctx.fillStyle = '#7fffd4';
+  ctx.shadowColor = '#7fffd4';
+  ctx.shadowBlur = 10;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.restore();
+}
+</file>
+
+<file path="public/js/render/stars.js">
+import { CONFIG } from '../config.js';
+
+// Фоновые звёзды с параллаксом. Рисуются в ЧИСТО экранных координатах
+// (без учёта camera.zoom) — иначе при сильном отдалении звёздный слой
+// сжимался бы в маленькое окошко вокруг центра.
+export function createStarField() {
+  const layers = CONFIG.stars.layers.map((cfg) => ({
+    ...cfg,
+    stars: [],
+    worldW: 0,
+    worldH: 0,
+  }));
+
+  function init(width, height) {
+    const mult = CONFIG.stars.worldMultiplier;
+    const worldW = width * mult;
+    const worldH = height * mult;
+
+    for (const layer of layers) {
+      layer.worldW = worldW;
+      layer.worldH = worldH;
+      layer.stars.length = 0;
+      for (let i = 0; i < layer.count; i++) {
+        layer.stars.push({
+          x: Math.random() * worldW,
+          y: Math.random() * worldH,
+          size: layer.size[0] + Math.random() * (layer.size[1] - layer.size[0]),
+          twinkle: Math.random() * Math.PI * 2,
+          twinkleSpeed: 0.005 + Math.random() * 0.02,
+          hue: 200 + Math.random() * 60,
+        });
+      }
+    }
+  }
+
+  function draw(ctx, { width, height }, camX, camY) {
+    for (const layer of layers) {
+      const offX = -camX * layer.depth;
+      const offY = -camY * layer.depth;
+
+      for (const s of layer.stars) {
+        let sx = (s.x + offX) % layer.worldW;
+        let sy = (s.y + offY) % layer.worldH;
+        if (sx < 0) sx += layer.worldW;
+        if (sy < 0) sy += layer.worldH;
+
+        s.twinkle += s.twinkleSpeed;
+        const a = layer.alpha * (0.65 + 0.35 * Math.sin(s.twinkle));
+
+        for (let tx = -1; tx <= 1; tx++) {
+          for (let ty = -1; ty <= 1; ty++) {
+            const px = sx + tx * layer.worldW;
+            const py = sy + ty * layer.worldH;
+            if (px < -20 || px > width + 20 || py < -20 || py > height + 20) continue;
+
+            ctx.beginPath();
+            ctx.fillStyle = `hsla(${s.hue}, 60%, 88%, ${a})`;
+            if (layer.glow) {
+              ctx.shadowColor = `hsla(${s.hue}, 80%, 80%, ${a})`;
+              ctx.shadowBlur = 8;
+            }
+            ctx.arc(px, py, s.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+          }
+        }
+      }
+    }
+  }
+
+  return { init, draw };
+}
+</file>
+
+<file path="public/js/render/throttleIndicator.js">
+export function drawThrottleIndicator(ctx, ship, vp) {
+  const x = 60;
+  const y = vp.height - 60;
+  const size = 40; // Половина размера крестовины
+
+  ctx.save();
+
+  // Фон
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+  ctx.fillRect(x - size - 10, y - size - 10, size * 2 + 20, size * 2 + 20);
+
+  // Оси
+  ctx.strokeStyle = 'rgba(120, 200, 255, 0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x - size, y); ctx.lineTo(x + size, y);
+  ctx.moveTo(x, y - size); ctx.lineTo(x, y + size);
+  ctx.stroke();
+
+  // Текущая точка (throttleLateral по X, throttleMain по Y)
+  const px = x + ship.throttleLateral * size;
+  const py = y - ship.throttleMain * size;
+
+  // Линии от центра до точки
+  ctx.strokeStyle = 'rgba(127, 255, 212, 0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x, y); ctx.lineTo(px, py);
+  ctx.stroke();
+
+  // Точка
+  ctx.beginPath();
+  ctx.arc(px, py, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#7fffd4';
+  ctx.shadowColor = '#7fffd4';
+  ctx.shadowBlur = 10;
+  ctx.fill();
+
+  ctx.restore();
+}
+</file>
+
+<file path="public/js/render/trail.js">
+// Рисует трейл — след из последних позиций корабля.
+// Точки в мировых координатах. Толщина и альфа постоянны на экране
+// (делим на зум), цвет — бирюзовый, гаснет к «хвосту».
+export function drawTrail(ctx, points) {
+  if (!points || points.length < 2) return;
+
+  const m = ctx.getTransform();
+  const zoom = Math.max(Math.hypot(m.a, m.b), 1e-6);
+  const lw = 2 / zoom;
+
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = lw;
+
+  // Разбиваем на сегменты — каждый со своей альфой.
+  // Чем ближе к «хвосту» (началу массива), тем прозрачнее.
+  const n = points.length - 1;
+  const CHUNK = 8;
+
+  for (let start = 0; start < n; start += CHUNK) {
+    const end = Math.min(start + CHUNK, n);
+    const tMid = (start + end) / (2 * n);
+    const alpha = 0.65 * tMid; // 0 у хвоста, 0.65 у носа
+
+    ctx.strokeStyle = `rgba(127, 255, 212, ${alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(points[start].x, points[start].y);
+    for (let i = start + 1; i <= end; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+</file>
+
+<file path="public/js/render/worldOverlay.js">
+import { CONFIG } from '../config.js';
+
+export function drawDistantSystems(ctx, world, camX, camY, viewport, nearestSys) {
+  const m = ctx.getTransform();
+  const zoom = Math.max(Math.hypot(m.a, m.b), 1e-6);
+  const halfW = (viewport.width / 2) / zoom;
+  const halfH = (viewport.height / 2) / zoom;
+
+  // Галактическая орбита — ТОЛЬКО для ближайшей системы.
+  if (nearestSys) {
+    const gcX = CONFIG.galaxy.centerX;
+    const gcY = CONFIG.galaxy.centerY;
+    const R = nearestSys.galR;
+    const offset = 2.0 / zoom;
+
+    ctx.save();
+    // Внешняя (синяя)
+    ctx.strokeStyle = 'rgba(60, 140, 255, 0.4)';
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(gcX, gcY, R + offset, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Внутренняя (красная)
+    ctx.strokeStyle = 'rgba(255, 60, 60, 0.4)';
+    ctx.beginPath();
+    ctx.arc(gcX, gcY, R - offset, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Все остальные системы.
+  for (const sys of world.systems.values()) {
+    if (!sys) continue;
+    if (sys === world.shipSystem) continue;
+
+    const dx = sys.cx - camX;
+    const dy = sys.cy - camY;
+    if (Math.abs(dx) > halfW + sys.influenceRadius) continue;
+    if (Math.abs(dy) > halfH + sys.influenceRadius) continue;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(140, 180, 255, 0.06)';
+    ctx.lineWidth = 1 / zoom;
+    for (const p of sys.planets) {
+      ctx.beginPath();
+      ctx.arc(sys.cx, sys.cy, p.orbit, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    drawStarDot(ctx, sys.star, zoom);
+
+    for (const p of sys.planets) {
+      const px = p.x - camX;
+      const py = p.y - camY;
+      if (Math.abs(px) > halfW + p.radius) continue;
+      if (Math.abs(py) > halfH + p.radius) continue;
+      const r = Math.max(p.radius, 1.5 / zoom);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      for (const moon of p.moons) {
+        const mx = moon.x - camX;
+        const my = moon.y - camY;
+        if (Math.abs(mx) > halfW + moon.radius) continue;
+        if (Math.abs(my) > halfH + moon.radius) continue;
+        const mr = Math.max(moon.radius, 0.8 / zoom);
+        ctx.fillStyle = moon.color;
+        ctx.beginPath();
+        ctx.arc(moon.x, moon.y, mr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+}
+
+function drawStarDot(ctx, s, zoom) {
+  const glowR = Math.max(s.radius * 2, 10 / zoom);
+  const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, glowR);
+  grad.addColorStop(0, s.color);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, glowR, 0, Math.PI * 2);
+  ctx.fill();
+  const coreR = Math.max(s.radius, 2 / zoom);
+  ctx.fillStyle = s.color;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, coreR, 0, Math.PI * 2);
+  ctx.fill();
+}
+</file>
+
+<file path="public/js/world/world.js">
+import { CONFIG } from '../config.js';
+import { generateSystemsInCell } from '../entities/systemGenerator.js';
+
+export function createWorld() {
+  // Генерируем случайный сид, если в конфиге null
+  const seed = (typeof CONFIG.world.seed === 'number')
+    ? CONFIG.world.seed
+    : (Math.floor(Math.random() * 0xFFFFFFFF) | 0);
+
+  console.log('[world] seed =', seed, '(', seed.toString(16), ')');
+
+  const world = {
+    seed,
+    globalTime: 0,
+    systems: new Map(),
+    loadedCells: new Set(),
+    shipSystem: null,
+    captureSystem: null,
+    lastGenPos: { x: -1e12, y: -1e12 },
+  };
+
+  const startCol = CONFIG.world.startCol;
+  const startRow = CONFIG.world.startRow;
+  loadCell(world, startCol, startRow);
+  
+  const startKey = findStartKey(world, startCol, startRow);
+  if (!startKey) {
+    console.error("[world] FATAL: Нет стартовой системы!");
+    const dummySys = generateSystemsInCell(startCol, startRow, world.seed)[0];
+    if (dummySys) {
+      updateSystemPositions(dummySys, world.globalTime);
+      world.systems.set(startCol + ',' + startRow + ',0', dummySys);
+      world.shipSystem = dummySys;
+      world.captureSystem = dummySys;
+    }
+  } else {
+    world.shipSystem = world.systems.get(startKey);
+    world.captureSystem = world.shipSystem;
+  }
+
+  return world;
+}
+
+function findStartKey(world, col, row) {
+  for (const k of world.systems.keys()) {
+    if (k.startsWith(`${col},${row},`)) return k;
+  }
+  return null;
+}
+
+export function loadCell(world, col, row) {
+  const cellKey = col + ',' + row;
+  if (world.loadedCells.has(cellKey)) return;
+  world.loadedCells.add(cellKey);
+
+  const systems = generateSystemsInCell(col, row, world.seed);
+  for (let i = 0; i < systems.length; i++) {
+    const sys = systems[i];
+    updateSystemPositions(sys, world.globalTime);
+    world.systems.set(`${col},${row},${i}`, sys);
+  }
+}
+
+export function updateSystemPositions(sys, globalTime) {
+  if (!sys || !sys.star) return;
+  
+  const t = globalTime;
+  sys.worldTime = t;
+
+  const gcX = CONFIG.galaxy.centerX;
+  const gcY = CONFIG.galaxy.centerY;
+
+  const galAngle = sys.galPhase + sys.galOmega * t;
+  sys.cx = gcX + Math.cos(galAngle) * sys.galR;
+  sys.cy = gcY + Math.sin(galAngle) * sys.galR;
+
+  sys.starVx = -Math.sin(galAngle) * sys.galOmega * sys.galR;
+  sys.starVy =  Math.cos(galAngle) * sys.galOmega * sys.galR;
+
+  sys.star.x = sys.cx;
+  sys.star.y = sys.cy;
+  sys.star.vx = sys.starVx;
+  sys.star.vy = sys.starVy;
+
+  for (const p of sys.planets) {
+    const angle = p.phase + p.omega * t;
+    p.x = sys.cx + Math.cos(angle) * p.orbit;
+    p.y = sys.cy + Math.sin(angle) * p.orbit;
+    p.vx = sys.starVx + (-Math.sin(angle) * p.omega * p.orbit);
+    p.vy = sys.starVy + ( Math.cos(angle) * p.omega * p.orbit);
+
+    for (const m of p.moons) {
+      const mA = m.phase + m.omega * t;
+      m.x = p.x + Math.cos(mA) * m.orbit;
+      m.y = p.y + Math.sin(mA) * m.orbit;
+      m.vx = p.vx + (-Math.sin(mA) * m.omega * m.orbit);
+      m.vy = p.vy + ( Math.cos(mA) * m.omega * m.orbit);
+    }
+  }
+}
+
+export function advanceWorld(world) {
+  world.globalTime += 1;
+  for (const sys of world.systems.values()) {
+    updateSystemPositions(sys, world.globalTime);
+  }
+}
+
+export function updateWorldGeneration(world, shipX, shipY) {
+  const R2 = CONFIG.world.R_gen * CONFIG.world.R_gen;
+  const dx = shipX - world.lastGenPos.x;
+  const dy = shipY - world.lastGenPos.y;
+  const halfCell = CONFIG.world.cellSize / 2;
+  if (dx * dx + dy * dy < halfCell * halfCell) return;
+
+  world.lastGenPos.x = shipX;
+  world.lastGenPos.y = shipY;
+
+  const cell = CONFIG.world.cellSize;
+  const colMin = Math.floor((shipX - CONFIG.world.R_gen) / cell);
+  const colMax = Math.floor((shipX + CONFIG.world.R_gen) / cell);
+  const rowMin = Math.floor((shipY - CONFIG.world.R_gen) / cell);
+  const rowMax = Math.floor((shipY + CONFIG.world.R_gen) / cell);
+
+  for (let col = colMin; col <= colMax; col++) {
+    for (let row = rowMin; row <= rowMax; row++) {
+      loadCell(world, col, row);
+    }
+  }
+}
+
+export function updateShipSystem(world, shipX, shipY) {
+  let inInfluence = null;
+  let inCapture = null;
+  let bestCaptureDist = Infinity;
+
+  for (const sys of world.systems.values()) {
+    if (!sys) continue;
+    const d = Math.hypot(shipX - sys.cx, shipY - sys.cy);
+    if (d < sys.influenceRadius) {
+      inInfluence = sys;
+      break;
+    }
+    if (d < sys.captureRadius && d < bestCaptureDist) {
+      inCapture = sys;
+      bestCaptureDist = d;
+    }
+  }
+
+  world.shipSystem = inInfluence;
+  world.captureSystem = inCapture;
+}
+</file>
+
+<file path="public/js/config.js">
+export const CONFIG = {
+  tick: { rate: 360, maxFrameDelta: 100 },
+  physics: {
+    G: 0.6,
+    softening: 4,
+    accel: 0.0025,
+    lateralAccel: 0.00125, // Уменьшено вдвое
+    throttleRate: 2.5,     // Скорость достижения полного газа (за 0.4с)
+  },
+  impulse: {
+    brakeAccel: 0.15,
+    chargePerUnit: 0.5,
+    maxCharge: 100,
+    releaseRatio: 1.0,
+  },
+  ship: {
+    radius: 2,
+    minScreenRadius: 3,
+    startAngle: Math.PI,
+    startOrbit: 4200,
+    turnAccel: 0.0006,
+    turnMax: 0.01,
+    turnDamping: 0.93,
+  },
+  hill: {
+    timeScale: 0.5,
+    hintScale: 200,
+    fitFraction: 0.85,
+  },
+  autopilot: {
+    miniHillFraction: 0.2,
+    chargeTime: 5.0,
+    lockRadiusFactor: 0.3,
+    lockRadiusOffset: 0,
+    kPos: 0.2,
+    kVel: 0.5,
+    maxAccelFactor: 10.0,
+    deadRadius: 1.5,
+    deadSpeed: 0.03,
+  },
+  camera: {
+    zoomMin: 0.00133,
+    zoomMax: 5.0,
+    zoomStep: 1.15,
+    startZoom: 0.05,
+    smooth: 0.08,
+  },
+  prediction: {
+    horizon: 12000,
+    sampleEvery: 20,
+    maxPoints: 600,
+  },
+  world: {
+    seed: null,
+    cellSize: 312500,
+    systemChance: 0.5,
+    R_gen: 1500000,
+    R_unload: 3000000,
+    captureMultiplier: 3.0,
+    startCol: 0,
+    startRow: 0,
+  },
+  galaxy: {
+    centerX: -30000000,
+    centerY: -30000000,
+    omega: 0.00000001,
+  },
+  stars: {
+    layers: [
+      { count: 220, size: [0.4, 1.1], depth: 0.08, alpha: 0.5 },
+      { count: 140, size: [0.8, 1.8], depth: 0.15, alpha: 0.7 },
+      { count: 70,  size: [1.2, 2.6], depth: 0.3, alpha: 0.9 },
+      { count: 25,  size: [1.8, 3.2], depth: 0.6,  alpha: 1.0, glow: true },
+    ],
+    worldMultiplier: 3,
+  },
+  bg: { base: '#05070f', glowInner: 'rgba(30, 60, 100, 0.18)', glowOuter: 'rgba(0, 0, 0, 0)' },
+};
+</file>
+
+<file path="public/js/main.js">
+import { CONFIG } from './config.js';
+import { state } from './core/state.js';
+import { simulateTick, predictTrajectory, predictStopPoint, predictSideTrajectories } from './core/physics.js';
+import { advanceWorld, updateWorldGeneration, updateShipSystem } from './world/world.js';
+import { startLoop } from './core/loop.js';
+import { input, bindControls } from './input/controls.js';
+import { camera, bindWheel } from './input/wheel.js';
+import { createCanvas } from './render/canvas.js';
+import { createStarField } from './render/stars.js';
+import { drawShip } from './render/ship.js';
+import { drawBodies } from './render/bodies.js';
+import { drawPrediction } from './render/prediction.js';
+import { drawTrail } from './render/trail.js';
+import { drawOrbitHints } from './render/orbitHints.js';
+import { drawDistantSystems } from './render/worldOverlay.js';
+import { drawImpulseBar } from './render/impulseBar.js';
+import { drawThrottleIndicator } from './render/throttleIndicator.js';
+import { createHud } from './render/hud.js';
+import { dominantBody } from './entities/bodies.js';
+import {
+  beginFrame, endFrame, addTick,
+  tStart, tEnd, drawProfiler,
+} from './core/profiler.js';
+
+const canvasEl = document.getElementById('space');
+const canvas = createCanvas(canvasEl);
+const stars = createStarField();
+const hud = createHud();
+
+camera.zoom = CONFIG.camera.startZoom;
+
+const camState = {
+  x: state.ship.x,
+  y: state.ship.y,
+  angle: state.ship.angle,
+  zoom: camera.zoom,
+};
+
+let lastSystemRef = null;
+let lastHillPlanet = null;
+let zoomBeforeHill = camera.zoom;
+let lastFrameTime = performance.now();
+
+function resize() {
+  const vp = canvas.resize();
+  state.viewport = vp;
+  stars.init(vp.width, vp.height);
+}
+window.addEventListener('resize', resize);
+resize();
+
+bindControls({
+  btnThrust:  document.getElementById('thrust'),
+  btnReverse: document.getElementById('reverse'),
+  btnLeft:    document.getElementById('left'),
+  btnRight:   document.getElementById('right'),
+});
+bindWheel(canvasEl);
+
+function onTick(dtReal) {
+  tStart('gen');
+  updateWorldGeneration(state.world, state.ship.x, state.ship.y);
+  addTick('gen', tEnd('gen'));
+
+  tStart('shipSys');
+  updateShipSystem(state.world, state.ship.x, state.ship.y);
+  addTick('shipSys', tEnd('shipSys'));
+
+  tStart('phys');
+  const safeDt = Math.min(0.1, Math.max(0, dtReal));
+  simulateTick(state, input, state.bodies, safeDt);
+  addTick('phys', tEnd('phys'));
+
+  tStart('advance');
+  advanceWorld(state.world);
+  addTick('advance', tEnd('advance'));
+
+  tStart('trail');
+  advanceTrail();
+  addTick('trail', tEnd('trail'));
+}
+
+function advanceTrail() {
+  const t = state.trail;
+  if (state.tickCount % t.sampleEvery !== 0) return;
+  t.points.push({ x: state.ship.x, y: state.ship.y });
+  if (t.points.length > t.maxPoints) t.points.shift();
+}
+
+function angleDiff(a, b) {
+  let d = b - a;
+  while (d >  Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
+function getOuterOrbit(system) {
+  let outer = 0;
+  for (const p of system.planets) {
+    if (p.orbit > outer) outer = p.orbit;
+  }
+  return outer || 1000;
+}
+
+function getNearestSystem(world, x, y) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const sys of world.systems.values()) {
+    if (!sys) continue;
+    const d = Math.hypot(x - sys.cx, y - sys.cy);
+    if (d < bestDist) {
+      best = sys;
+      bestDist = d;
+    }
+  }
+  return best;
+}
+
+function computeCameraTarget(vp) {
+  const ship = state.ship;
+  const system = state.world.shipSystem;
+  const planet = dominantBody(system, ship.x, ship.y);
+
+  if (system !== lastSystemRef) {
+    if (!lastSystemRef && system) {
+      const outer = getOuterOrbit(system);
+      camera.zoom = (Math.min(vp.width, vp.height) * CONFIG.hill.fitFraction) / (2 * outer);
+    } else if (lastSystemRef && !system) {
+      camera.zoom = CONFIG.camera.zoomMin;
+    } else if (lastSystemRef && system && lastSystemRef !== system) {
+      const outer = getOuterOrbit(system);
+      camera.zoom = (Math.min(vp.width, vp.height) * CONFIG.hill.fitFraction) / (2 * outer);
+    }
+    lastSystemRef = system;
+    lastHillPlanet = null;
+  }
+
+  if (planet !== lastHillPlanet) {
+    if (planet && !lastHillPlanet) {
+      zoomBeforeHill = camera.zoom;
+      camera.zoom = (Math.min(vp.width, vp.height) * CONFIG.hill.fitFraction) / (2 * planet.hill);
+    } else if (!planet && lastHillPlanet) {
+      camera.zoom = zoomBeforeHill;
+    }
+    lastHillPlanet = planet;
+  }
+
+  let targetX = ship.x;
+  let targetY = ship.y;
+
+  // Если мы ВНЕ системы, смещаем камеру.
+  // Нам нужно, чтобы корабль был в центре нижней четверти экрана.
+  // Это значит, что по экранной оси Y он должен быть на 25% высоты экрана ниже центра.
+  // В пикселях это vp.height * 0.25.
+  // Камера должна смотреть на 25% ВЫШЕ корабля в экранных координатах.
+  if (!system) {
+    const offsetScreenY = vp.height * 0.25; // смещение в пикселях
+    const offsetWorld = offsetScreenY / camState.zoom;
+    
+    // Вектор "вверх" на экране (0, -1) в мировых координатах с учётом поворота камеры.
+    // Камера отрисовывает мир, поворачивая его на (-Math.PI / 2 - camState.angle).
+    // Значит, чтобы сдвинуть камеру вверх по экрану, мы смещаем её вдоль мирового вектора,
+    // который после поворота станет (0, -1).
+    // Это вектор (Math.cos(camState.angle + Math.PI), Math.sin(camState.angle + Math.PI))
+    // Или проще: (cos(angle), sin(angle)) для направления вперед. 
+    // Нам нужно вверх. Вектор "вверх" для корабля (носа) — это (cos(angle), sin(angle)).
+    // Если смотреть вдоль носа, ось Y экрана — это перпендикуляр.
+    // Сместим камеру по локальной оси носа.
+    
+    // Если корабль смотрит вверх (angle = -Math.PI/2), вектор "вперед" = (0, -1). 
+    // На экране корабль в центре. Если мы сдвигаем камеру вдоль "вперед" (на -Y), 
+    // корабль сдвигается вниз на экране.
+    
+    // В нашем случае "вперед" (нос) на экране всегда смотрит вверх.
+    // Значит, смещение камеры "вперед" (в сторону носа) даст корабль ниже на экране.
+    // Вектор носа в мире: (Math.cos(camState.angle), Math.sin(camState.angle)).
+    
+    targetX += Math.cos(camState.angle) * offsetWorld;
+    targetY += Math.sin(camState.angle) * offsetWorld;
+  }
+
+  return {
+    x: targetX,
+    y: targetY,
+    angle: ship.angle,
+  };
+}
+
+function onRender(now) {
+  beginFrame(now);
+
+  const vp = state.viewport;
+  const ctx = canvas.ctx;
+  const ship = state.ship;
+  const system = state.world.shipSystem;
+
+  const dtReal = Math.min(0.1, (now - lastFrameTime) / 1000);
+  lastFrameTime = now;
+  
+  state._lastDtReal = dtReal;
+
+  tStart('camTarget');
+  const target = computeCameraTarget(vp);
+  camState.x = target.x;
+  camState.y = target.y;
+  camState.angle = target.angle;
+  camState.zoom *= Math.pow(camera.zoom / camState.zoom, CONFIG.camera.smooth);
+  tEnd('camTarget');
+
+  tStart('bg');
+  canvas.drawBackground(vp);
+  tEnd('bg');
+
+  tStart('stars');
+  stars.draw(ctx, vp, camState.x, camState.y);
+  tEnd('stars');
+
+  const nearestSys = getNearestSystem(state.world, ship.x, ship.y);
+
+  ctx.save();
+  ctx.translate(vp.width / 2, vp.height / 2);
+  ctx.scale(camState.zoom, camState.zoom);
+  ctx.rotate(-Math.PI / 2 - camState.angle);
+  ctx.translate(-camState.x, -camState.y);
+
+  tStart('distantSystems');
+  drawDistantSystems(ctx, state.world, camState.x, camState.y, vp, nearestSys);
+  tEnd('distantSystems');
+
+  if (system) {
+    tStart('currentSystem');
+    drawBodies(ctx, system, camState.x, camState.y, vp);
+    tEnd('currentSystem');
+  }
+
+  tStart('trail');
+  drawTrail(ctx, state.trail.points);
+  tEnd('trail');
+
+  const { horizon, sampleEvery } = CONFIG.prediction;
+  tStart('predCalc');
+  const points = predictTrajectory(ship, state.world, horizon, sampleEvery);
+
+  let stopPoint = null;
+  let sidePaths = null;
+  let stopDist = 0;
+
+  if (!system) {
+    stopPoint = predictStopPoint(ship, state.world, dtReal);
+    if (stopPoint) {
+      const dx = stopPoint.x - ship.x;
+      const dy = stopPoint.y - ship.y;
+      stopDist = Math.hypot(dx, dy);
+    }
+    if (stopDist > 0) {
+      sidePaths = predictSideTrajectories(ship, state.world, stopDist);
+    }
+  }
+  tEnd('predCalc');
+
+  const activePlanet = dominantBody(system, ship.x, ship.y);
+  
+  tStart('predDraw');
+  drawPrediction(ctx, points, state.tickCount, input.thrust || input.reverse, camState.angle, stopPoint, activePlanet !== null, sidePaths);
+  tEnd('predDraw');
+
+  if (activePlanet) {
+    tStart('orbitHints');
+    drawOrbitHints(ctx, ship, activePlanet, system);
+    tEnd('orbitHints');
+  }
+
+  tStart('ship');
+  drawShip(ctx, ship, input);
+  tEnd('ship');
+
+  ctx.restore();
+
+  if (ship.impulse > 0) {
+    const dx = ship.x - camState.x;
+    const dy = ship.y - camState.y;
+    const ca = Math.cos(-Math.PI / 2 - camState.angle);
+    const sa = Math.sin(-Math.PI / 2 - camState.angle);
+    const rx = dx * ca - dy * sa;
+    const ry = dx * sa + dy * ca;
+    const screenX = vp.width / 2 + rx * camState.zoom;
+    const screenY = vp.height / 2 + ry * camState.zoom;
+    
+    drawImpulseBar(ctx, ship, screenX, screenY);
+  }
+
+  drawThrottleIndicator(ctx, ship, vp);
+
+  endFrame(now);
+
+  tStart('profiler');
+  drawProfiler(ctx, vp);
+  tEnd('profiler');
+}
+
+function onAfterFrame() {
+  const system = state.world.shipSystem;
+  const planet = dominantBody(system, state.ship.x, state.ship.y);
+  const timeScale = planet ? CONFIG.hill.timeScale : 1;
+  hud.update(state.ship, state.tickCount, camState.zoom, system, planet, timeScale);
+}
+
+function getTimeScale() {
+  const system = state.world.shipSystem;
+  const planet = dominantBody(system, state.ship.x, state.ship.y);
+  let baseScale = planet ? CONFIG.hill.timeScale : 1;
+  return baseScale;
+}
+
+startLoop({ onTick, onRender, onAfterFrame, getTimeScale });
+console.log('[space] v63 config', CONFIG);
+</file>
+
+<file path="public/index.html">
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Космос — прототип</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="space"></canvas>
+
+  <div id="hud">
+    <div class="hud-item">Скорость: <span id="speed">0.00</span></div>
+    <div class="hud-item">Тик: <span id="tick">0</span></div>
+    <div class="hud-item">X: <span id="posX">0</span> Y: <span id="posY">0</span></div>
+    <div class="hud-item">Zoom: <span id="zoom">1.00</span></div>
+    <div class="hud-item">Сфера: <span id="sphere">—</span></div>
+    <div class="hud-item">Орбита: <span id="orbital">—</span></div>
+    <div class="hud-item" style="margin-left: auto;">Дата: <span id="date">1 апреля 5027</span></div>
+    <div class="hud-item">Возраст: <span id="age" style="color: #ff6060;">20 г. 0 мес.</span></div>
+    <div class="hud-item">Темп: <span id="timerate" style="color: #7fffd4;">x1.0</span></div>
+  </div>
+
+  <div id="controls">
+    <button id="left" class="btn turn" type="button">⟲</button>
+    <button id="thrust" class="btn thrust" type="button">▲ Двигатель</button>
+    <button id="reverse" class="btn reverse" type="button">▼ Реверс</button>
+    <button id="right" class="btn turn" type="button">⟳</button>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
+</file>
+
+<file path="package.json">
+{
+  "name": "space-game-prototype",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
+</file>
+
+<file path="server.js">
+const express = require('express');
+const path = require('path');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.listen(PORT, () => {
+  console.log(`Сервер запущен: http://localhost:${PORT}`);
+});
+</file>
+
+</files>
